@@ -1,0 +1,20 @@
+
+==============================================================================
+AAKCD detection latency report   (1 attacks, window 600s)
+==============================================================================
+
+#   TECHNIQUE    DETECTOR             MTTD(s)    CORR(s)    RESULT
+------------------------------------------------------------------
+1   T1053.003    Installation_Agent   13.3       -          DETECTED
+
+------------------------------------------------------------------
+Detected 1/1 (100% coverage)
+
+TECHNIQUE    N    MEAN(s)    MIN(s)     MAX(s)    
+--------------------------------------------------
+T1053.003    1    13.3       13.3       13.3      
+--------------------------------------------------
+OVERALL      1    13.3       13.3       13.3      
+
+Note: MTTD includes scheduler polling delay. Report the poll interval alongside these figures.
+

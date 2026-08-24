@@ -52,10 +52,10 @@
 
   <rule id="100104" level="6">
     <if_sid>100100</if_sid>
-    <field name="mitre.technique" type="pcre2">^T1053\.005$</field>
+    <field name="mitre.technique" type="pcre2">^T1053\.003$</field>
     <description>AAKCD Installation Agent: $(description)</description>
     <mitre>
-      <id>T1053.005</id>
+      <id>T1053.003</id>
     </mitre>
     <group>aakcd_installation,attack,</group>
   </rule>

@@ -17,6 +17,8 @@ build_task_description() -- everything else is shared.
 from __future__ import annotations
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
@@ -97,7 +99,7 @@ class BaseDetectionAgent(ABC):
                 "fill in your key, and load it (e.g. `python-dotenv`) "
                 "before running an agent."
             )
-        return LLM(model="groq/llama-3.3-70b-versatile", api_key=api_key)
+        return LLM(model=os.environ.get("AAKCD_MODEL", "groq/openai/gpt-oss-120b"), api_key=api_key)
 
     def reason_with_llm(self, telemetry: Any, target: str) -> DetectionResult:
         """Run one CrewAI agent+task against the collected telemetry and

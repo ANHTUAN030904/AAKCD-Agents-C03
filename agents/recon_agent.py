@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 from agents.base_agent import BaseDetectionAgent
+from agents.remote import demo_mode, no_telemetry_marker
 
 # Ports that are cheap, high-signal indicators for a first MVP detection.
 # Expand this list only after the Week 10 validation gate passes.
@@ -52,6 +53,11 @@ class ReconAgent(BaseDetectionAgent):
                 return result.stdout
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+
+        # Live eval: an empty/unreachable source is benign, not an
+        # attack. Only fall through to the canned sample in demo mode.
+        if not demo_mode():
+            return no_telemetry_marker("open ports")
 
         # Fallback sample so the pipeline is testable before nmap is set up.
         return (

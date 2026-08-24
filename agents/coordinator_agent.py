@@ -25,6 +25,8 @@ so reusing an IP as the label works fine for testing correlation):
 from __future__ import annotations
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from collections import defaultdict
 
 from schema.alert_schema import Alert, MitreMapping, write_alert, read_alerts
@@ -52,7 +54,7 @@ def _get_llm():
             "GROQ_API_KEY is not set. Copy .env.example to .env, "
             "fill in your key, and load it before running an agent."
         )
-    return LLM(model="groq/llama-3.3-70b-versatile", api_key=api_key)
+    return LLM(model=os.environ.get("AAKCD_MODEL", "groq/openai/gpt-oss-120b"), api_key=api_key)
 
 
 def collect_all_alerts() -> list[dict]:

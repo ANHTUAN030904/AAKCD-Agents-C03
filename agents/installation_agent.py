@@ -3,7 +3,7 @@ Installation agent -- fourth agent in the kill chain (see the build guide).
 
 Detection behaviour (kept to exactly ONE per the Week 6-7 scope cap):
     Inspect a scheduled-task/cron entry for persistence indicators
-    commonly used by attackers to survive reboot (MITRE T1053.005,
+    commonly used by attackers to survive reboot (MITRE T1053.003,
     Scheduled Task/Job: Scheduled Task).
 
 Run it directly for a quick local test (writes to installation_alerts.jsonl,
@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from agents.base_agent import BaseDetectionAgent
+from agents.remote import collect_remote, demo_mode, no_telemetry_marker
 
 # Cheap, high-signal indicators for a first MVP detection. Expand this
 # list only after the Week 10 validation gate passes.
@@ -43,7 +44,7 @@ class InstallationAgent(BaseDetectionAgent):
             agent_id="040",
             agent_name="Installation_Agent",
             agent_ip=agent_ip,
-            mitre_technique="T1053.005",
+            mitre_technique="T1053.003",
             mitre_tactic="Persistence",
             log_path=log_path,
         )
@@ -59,6 +60,11 @@ class InstallationAgent(BaseDetectionAgent):
         if sample_path.exists():
             return sample_path.read_text(encoding="utf-8")
 
+        # Live remote collection over SSH (Stage 3).
+        remote = collect_remote(["crontab", "-l"])
+        if remote:
+            return remote
+
         try:
             result = subprocess.run(
                 ["crontab", "-l"], capture_output=True, text=True, timeout=10, check=False,
@@ -67,6 +73,11 @@ class InstallationAgent(BaseDetectionAgent):
                 return result.stdout
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+
+        # Live eval: an empty/unreachable source is benign, not an
+        # attack. Only fall through to the canned sample in demo mode.
+        if not demo_mode():
+            return no_telemetry_marker("cron entries")
 
         # Fallback sample so the pipeline is testable before cron/schtasks
         # polling is set up.
@@ -88,7 +99,7 @@ class InstallationAgent(BaseDetectionAgent):
             "downloading and executing remote payloads, copying a shell "
             "to a hidden path, running at every boot/minute with no "
             "legitimate business purpose). If one does, treat it as "
-            "suspicious scheduled-task persistence (MITRE T1053.005, "
+            "suspicious scheduled-task persistence (MITRE T1053.003, "
             "Scheduled Task/Job: Scheduled Task)."
         )
 

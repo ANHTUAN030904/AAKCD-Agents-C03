@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from agents.base_agent import BaseDetectionAgent
+from agents.remote import collect_remote, demo_mode, no_telemetry_marker
 
 # Cheap, high-signal indicators for a first MVP detection. Expand this
 # list only after the Week 10 validation gate passes.
@@ -61,6 +62,11 @@ class C2Agent(BaseDetectionAgent):
         if sample_path.exists():
             return sample_path.read_text(encoding="utf-8")
 
+        # Live remote collection over SSH (Stage 3).
+        remote = collect_remote(["ss", "-tn"])
+        if remote:
+            return remote
+
         try:
             result = subprocess.run(
                 ["ss", "-tn"], capture_output=True, text=True, timeout=10, check=False,
@@ -69,6 +75,11 @@ class C2Agent(BaseDetectionAgent):
                 return result.stdout
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+
+        # Live eval: an empty/unreachable source is benign, not an
+        # attack. Only fall through to the canned sample in demo mode.
+        if not demo_mode():
+            return no_telemetry_marker("network connections")
 
         # Fallback sample so the pipeline is testable before connection
         # auditing is set up.

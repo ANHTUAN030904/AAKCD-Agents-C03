@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from agents.base_agent import BaseDetectionAgent
+from agents.remote import demo_mode, no_telemetry_marker
 
 # Cheap, high-signal indicators for a first MVP detection. Expand this
 # list only after the Week 10 validation gate passes.
@@ -59,6 +60,11 @@ class DeliveryAgent(BaseDetectionAgent):
         sample_path = Path("emails") / f"{target}.txt"
         if sample_path.exists():
             return sample_path.read_text(encoding="utf-8")
+
+        # Live eval: no email sample means nothing to analyse -> benign.
+        # Only use the canned phishing sample in demo mode.
+        if not demo_mode():
+            return no_telemetry_marker("emails")
 
         # Fallback sample so the pipeline is testable before mailbox
         # access is set up.
