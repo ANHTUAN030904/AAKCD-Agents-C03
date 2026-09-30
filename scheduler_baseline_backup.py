@@ -1,16 +1,9 @@
-"""AAKCD scheduler (Stage 3F). Runs all five detection agents against the
-victim on a fixed interval, in parallel, then correlates. Records per-cycle
-timing and severities to scheduler_cycles.jsonl, and writes an explicit
-error-alert to agent_errors.jsonl when an agent crashes (so a failure is
-distinguishable from a genuine no-detection).
-
-Supports two modes for the cue comparison:
-  baseline (default): all agents polled on a fixed interval, independent.
-  --warning: feed-forward cue. When an EARLY-phase agent (recon, delivery,
-             or exploitation) detects an attack, the scheduler drops to a
-             shorter interval for the next HIGH_ALERT_CYCLES cycles, so the
-             later phases (installation, c2) are re-polled sooner. This is
-             the cue-ENABLED mode."""
+"""AAKCD baseline scheduler (Stage 3E). Runs all five detection agents
+against the victim on a fixed interval, in parallel, then correlates.
+Records per-cycle timing and severities to scheduler_cycles.jsonl, and
+writes an explicit error-alert to agent_errors.jsonl when an agent crashes
+(so a failure is distinguishable from a genuine no-detection). This is the
+cue-DISABLED baseline."""
 
 from __future__ import annotations
 import argparse, json, time
@@ -33,12 +26,6 @@ AGENTS = [
 ]
 CYCLE_LOG = "scheduler_cycles.jsonl"
 ERROR_LOG = "agent_errors.jsonl"
-
-# --- warning-mode config ---
-# Early kill-chain phases whose detection warns the later phases.
-EARLY_AGENTS = {"recon", "delivery", "exploitation"}
-WARN_SEVERITY = 7          # severity that counts as a real detection
-HIGH_ALERT_CYCLES = 3       # number of cycles to stay on the fast interval after a warning
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -101,63 +88,31 @@ def run_cycle(cycle_id, target, agent_ip, mode, stagger):
     return cycle
 
 def main():
-    p = argparse.ArgumentParser(description="AAKCD scheduler (baseline / warning)")
+    p = argparse.ArgumentParser(description="AAKCD baseline scheduler")
     p.add_argument("--target", required=True)
     p.add_argument("--agent-ip", default="127.0.0.1")
     p.add_argument("--interval", type=int, default=30)
     p.add_argument("--cycles", type=int, default=0)
     p.add_argument("--mode", choices=["parallel", "serial"], default="parallel")
     p.add_argument("--stagger", type=float, default=0.0)
-    p.add_argument("--warning", action="store_true",
-                   help="enable feed-forward cue: early-phase detection speeds up later cycles")
-    p.add_argument("--alert-interval", type=int, default=5,
-                   help="cycle interval (s) while on high alert (warning mode only)")
     args = p.parse_args()
-
     import litellm  # warm-up: finish one-time init single-threaded
     _ = litellm
-
     print(f"[scheduler] target={args.target} interval={args.interval}s mode={args.mode} "
-          f"warning={'ON' if args.warning else 'OFF'}"
-          f"{' alert-interval='+str(args.alert_interval)+'s' if args.warning else ''} "
           f"cycles={'inf' if args.cycles == 0 else args.cycles}")
     print(f"[scheduler] cycle log -> {CYCLE_LOG}, error log -> {ERROR_LOG}\n[scheduler] Ctrl+C to stop.\n")
-
     cycle_id = 0
-    high_alert_remaining = 0        # warning-mode state: cycles left on the fast interval
     try:
         while True:
             cycle_id += 1
             start = time.monotonic()
             cyc = run_cycle(cycle_id, args.target, args.agent_ip, args.mode, args.stagger)
             sev = {a["agent"]: a.get("severity", "ERR") for a in cyc["agents"]}
-
-            # --- warning logic: did an EARLY-phase agent fire this cycle? ---
-            if args.warning:
-                triggered = any(
-                    a["agent"] in EARLY_AGENTS
-                    and isinstance(a.get("severity"), int)
-                    and a["severity"] >= WARN_SEVERITY
-                    for a in cyc["agents"]
-                )
-                if triggered:
-                    high_alert_remaining = HIGH_ALERT_CYCLES   # (re)arm the fast window
-
-            # choose this cycle's sleep interval
-            if args.warning and high_alert_remaining > 0:
-                interval = args.alert_interval
-                high_alert_remaining -= 1
-                alert_flag = f"  [HIGH-ALERT {interval}s]"
-            else:
-                interval = args.interval
-                alert_flag = ""
-
             print(f"[cycle {cycle_id}] {cyc['cycle_start']}  severities={sev}  "
-                  f"correlated={cyc.get('correlated_hosts', 0)}{alert_flag}")
-
+                  f"correlated={cyc.get('correlated_hosts', 0)}")
             if args.cycles and cycle_id >= args.cycles:
                 break
-            time.sleep(max(0.0, interval - (time.monotonic() - start)))
+            time.sleep(max(0.0, args.interval - (time.monotonic() - start)))
     except KeyboardInterrupt:
         print("\n[scheduler] stopped by user.")
 

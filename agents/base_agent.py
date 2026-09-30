@@ -3,15 +3,9 @@ Base class every kill-chain agent (Recon, Delivery, Exploitation,
 Installation, C2) extends.
 
 The pattern is always the same three steps:
-    1. collect_telemetry()  -- gather raw data (nmap output, an email, a
-                                process list, a bash log line, ...)
-    2. reason_with_llm()    -- hand that telemetry to Gemini via CrewAI and
-                                get back a structured judgement
-    3. to_alert()           -- turn that judgement into a schema-conformant
-                                Alert and write it to the local log
-
-Each subclass only needs to implement collect_telemetry() and
-build_task_description() -- everything else is shared.
+    1. collect_telemetry()  -- gather raw data
+    2. reason_with_llm()    -- hand telemetry to the LLM via CrewAI
+    3. to_alert()           -- turn the judgement into an Alert and log it
 """
 
 from __future__ import annotations
@@ -25,16 +19,12 @@ from typing import Any
 
 from schema.alert_schema import Alert, MitreMapping, write_alert
 
-# CrewAI / Gemini imports are deferred into _get_llm() so this module can be
-# imported (and its structure inspected/tested) even before `pip install
-# crewai google-generativeai` has been run on a given machine.
-
 
 @dataclass
 class DetectionResult:
-    """What build_task_description()'s LLM call should hand back, parsed
-    into plain fields the base class can turn into an Alert."""
+    """Parsed LLM judgement the base class turns into an Alert."""
     suspicious: bool
+    severity: int              # 0 (benign) .. 12 (critical), graded by the LLM
     confidence: str            # "low" | "medium" | "high"
     summary: str
     target_host: str
@@ -58,65 +48,33 @@ class BaseDetectionAgent(ABC):
         self.mitre_tactic = mitre_tactic
         self.log_path = log_path
 
-    # ------------------------------------------------------------------
-    # Each agent implements these two methods only.
-    # ------------------------------------------------------------------
-
     @abstractmethod
     def collect_telemetry(self, target: str) -> Any:
-        """Gather the raw data this agent inspects for its ONE detection
-        behaviour (per the Week 6-7 scope cap: exactly one signal per
-        agent). `target` is normally an IP/hostname."""
+        """Gather the raw data this agent inspects for its ONE behaviour."""
         raise NotImplementedError
 
     @abstractmethod
     def build_task_description(self, telemetry: Any, target: str) -> str:
-        """Return the natural-language prompt/task description CrewAI
-        will hand to Gemini, given the telemetry just collected."""
+        """Return the prompt CrewAI hands to the LLM given the telemetry."""
         raise NotImplementedError
 
-    # ------------------------------------------------------------------
-    # Shared machinery -- do not override in subclasses.
-    # ------------------------------------------------------------------
-
     def _get_llm(self):
-        """Lazily construct the Groq-backed CrewAI LLM. Requires
-        GROQ_API_KEY to be set (see .env.example).
-
-        NOTE: this project originally targeted Gemini, but as of August 2026
-        Google's newly-issued "AQ." auth-format API keys are broken against
-        both the legacy and the new Interactions API endpoints (confirmed
-        via direct REST testing and matching multiple live reports on
-        Google's own AI developer forum). Groq was swapped in as a working,
-        free-tier replacement -- same CrewAI LLM interface, no other code
-        changes needed. Revisit Gemini once Google resolves the bug."""
-        from crewai import LLM  # deferred import, see module docstring
+        """Lazily construct the Groq-backed CrewAI LLM. Requires GROQ_API_KEY."""
+        from crewai import LLM  # deferred import
 
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
             raise RuntimeError(
                 "GROQ_API_KEY is not set. Copy .env.example to .env, "
-                "fill in your key, and load it (e.g. `python-dotenv`) "
-                "before running an agent."
+                "fill in your key, and load it before running an agent."
             )
         return LLM(model=os.environ.get("AAKCD_MODEL", "groq/openai/gpt-oss-120b"), api_key=api_key)
 
     def reason_with_llm(self, telemetry: Any, target: str) -> DetectionResult:
-        """Run one CrewAI agent+task against the collected telemetry and
-        parse the result into a DetectionResult.
-
-        NOTE: this method defines the *contract* your Gemini prompt must
-        satisfy (see the required output fields in build_task_description
-        docstring below) -- adjust the parsing here if you change the
-        prompt's expected output format.
-        """
+        """Run one CrewAI agent+task against the telemetry and parse the result."""
         from crewai import Agent, Task, Crew  # deferred import
 
-        # Workaround for a known CrewAI bug (crewAIInc/crewAI #5886): it
-        # injects an Anthropic-only prompt-caching field into every
-        # request's messages, which non-Anthropic providers like Groq
-        # reject outright ("property 'cache_breakpoint' is unsupported").
-        # No-op the function that adds it until CrewAI ships a real fix.
+        # Workaround for CrewAI bug #5886 (Anthropic-only cache field breaks Groq).
         import crewai.llms.cache as _crewai_cache
         _crewai_cache.mark_cache_breakpoint = lambda msg: msg
 
@@ -136,13 +94,16 @@ class BaseDetectionAgent(ABC):
         task_description += (
             "\n\nRespond in EXACTLY this format (no extra text):\n"
             "SUSPICIOUS: <true|false>\n"
+            "SEVERITY: <integer 0-12; 0 = benign, 1-4 = low, 5-8 = medium, "
+            "9-11 = high, 12 = critical. Rate how strongly the telemetry "
+            "indicates this agent's specific attack behaviour.>\n"
             "CONFIDENCE: <low|medium|high>\n"
             "SUMMARY: <one paragraph a SOC analyst can read directly>\n"
             "RECOMMENDED_ACTION: <one concrete next step>\n"
         )
 
         task = Task(description=task_description, agent=analyst,
-                    expected_output="The four labelled fields described above.")
+                    expected_output="The five labelled fields described above.")
         crew = Crew(agents=[analyst], tasks=[task], verbose=False)
         raw_result = str(crew.kickoff())
 
@@ -150,15 +111,33 @@ class BaseDetectionAgent(ABC):
 
     @staticmethod
     def _parse_result(raw: str, target: str) -> DetectionResult:
-        fields = {"SUSPICIOUS": "false", "CONFIDENCE": "low",
+        fields = {"SUSPICIOUS": "false", "SEVERITY": "", "CONFIDENCE": "low",
                   "SUMMARY": raw.strip(), "RECOMMENDED_ACTION": "Review manually."}
         for line in raw.splitlines():
             for key in fields:
                 prefix = f"{key}:"
                 if line.strip().upper().startswith(prefix):
                     fields[key] = line.split(":", 1)[1].strip()
+
+        suspicious = fields["SUSPICIOUS"].strip().lower().startswith("t")
+
+        # parse the LLM's severity number; clamp to 0-12
+        sev_txt = "".join(ch for ch in fields["SEVERITY"] if ch.isdigit())
+        if sev_txt:
+            severity = max(0, min(12, int(sev_txt)))
+        else:
+            # LLM gave no number -> fall back to old binary behaviour
+            severity = 12 if suspicious else 0
+
+        # keep the two consistent
+        if severity == 0:
+            suspicious = False
+        elif not suspicious:
+            suspicious = True
+
         return DetectionResult(
-            suspicious=fields["SUSPICIOUS"].strip().lower().startswith("t"),
+            suspicious=suspicious,
+            severity=severity,
             confidence=fields["CONFIDENCE"].strip().lower(),
             summary=fields["SUMMARY"],
             target_host=target,
@@ -175,15 +154,12 @@ class BaseDetectionAgent(ABC):
             confidence=result.confidence if result.confidence in ("low", "medium", "high") else "low",
             description=result.summary,
             mitre=MitreMapping(technique=self.mitre_technique, tactic=self.mitre_tactic),
-            severity=12 if result.suspicious else 0,
+            severity=result.severity,
             recommended_action=result.recommended_action,
         )
 
     def run_once(self, target: str, category: str) -> Alert | None:
-        """Run one full detection cycle against `target`. Returns the
-        Alert if written, or None if nothing suspicious was found (the
-        reference team still logged clean scans at severity 0 -- adjust
-        this if your agent should stay silent on clean results instead)."""
+        """Run one full detection cycle against `target`."""
         telemetry = self.collect_telemetry(target)
         result = self.reason_with_llm(telemetry, target)
         alert = self.to_alert(result, category)
