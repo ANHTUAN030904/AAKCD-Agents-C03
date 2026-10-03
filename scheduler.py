@@ -38,7 +38,7 @@ ERROR_LOG = "agent_errors.jsonl"
 # Early kill-chain phases whose detection warns the later phases.
 EARLY_AGENTS = {"recon", "delivery", "exploitation"}
 WARN_SEVERITY = 7          # severity that counts as a real detection
-HIGH_ALERT_CYCLES = 3       # number of cycles to stay on the fast interval after a warning
+HIGH_ALERT_CYCLES = 10       # number of cycles to stay on the fast interval after a warning
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()

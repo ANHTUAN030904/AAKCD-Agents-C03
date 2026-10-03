@@ -1,0 +1,171 @@
+##########################################################################
+#                   AAKCD KILL-CHAIN DETECTION REPORT                    #
+#                         Antaeus AI (Team C03)                          #
+##########################################################################
+
+==========================================================================
+[NONE] RECONNAISSANCE ALERT  (severity 0)
+==========================================================================
+Timestamp : 2026-09-30T08:12:51.770576+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Recon_Agent
+Summary   : The Nmap scan of host 10.10.10.30 shows only port 22 (SSH) open; none of the high‑risk ports monitored by this agent (21, 23, 3389, 5900) are reachable, indicating no evidence of the targeted network service discovery behavior.
+
+MITRE ATT&CK
+  Technique : T1046
+  Tactic    : Discovery
+
+Details
+  The Nmap scan of host 10.10.10.30 shows only port 22 (SSH) open; none of
+  the high‑risk ports monitored by this agent (21, 23, 3389, 5900) are
+  reachable, indicating no evidence of the targeted network service
+  discovery behavior.
+
+Final Answer:
+  - Category          : network_recon
+  - Confidence        : high
+  - Severity          : 0
+  - Recommended action: No immediate remediation needed; retain regular network monitoring.
+
+==========================================================================
+[MEDIUM] DELIVERY ALERT  (severity 10)
+==========================================================================
+Timestamp : 2026-09-30T08:12:55.430309+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Delivery_Agent
+Summary   : The email contains multiple high‑confidence phishing indicators: an urgent “account suspended” warning, a request to “verify your account,” a “click here” call‑to‑action, and a shortened Bit.ly URL, all typical of credential‑harvesting spearphishing links (MITRE T1566.002).
+
+MITRE ATT&CK
+  Technique : T1566.002
+  Tactic    : Initial Access
+
+Details
+  The email contains multiple high‑confidence phishing indicators: an
+  urgent “account suspended” warning, a request to “verify your account,”
+  a “click here” call‑to‑action, and a shortened Bit.ly URL, all typical
+  of credential‑harvesting spearphishing links (MITRE T1566.002). The
+  sender domain also attempts to masquerade as a legitimate support
+  address.
+
+Final Answer:
+  - Category          : email_phishing
+  - Confidence        : high
+  - Severity          : 10
+  - Recommended action: Quarantine the message and block the sender domain, then have the security team investigate the Bit.ly link and user impact.
+
+==========================================================================
+[MEDIUM] EXPLOITATION ALERT  (severity 8)
+==========================================================================
+Timestamp : 2026-09-30T08:12:59.852853+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Exploitation_Agent
+Summary   : The command echoes a Base64‑encoded string, decodes it with `base64 -d`, and immediately pipes the result into `bash`.
+
+MITRE ATT&CK
+  Technique : T1027
+  Tactic    : Defense Evasion
+
+Details
+  The command echoes a Base64‑encoded string, decodes it with `base64 -d`,
+  and immediately pipes the result into `bash`. This is a classic
+  obfuscation technique—using Base64 to hide the actual script content
+  before execution—and matches the watched indicators (“base64”, “|
+  bash”). Such behavior is commonly used to deliver malicious payloads
+  while evading simple string‑based detections.
+
+Final Answer:
+  - Category          : obfuscated_execution
+  - Confidence        : high
+  - Severity          : 8
+  - Recommended action: Capture the decoded payload, submit it to a malware analysis sandbox, and block any network connections initiated by the resulting script.
+
+==========================================================================
+[MEDIUM] INSTALLATION ALERT  (severity 9)
+==========================================================================
+Timestamp : 2026-09-30T08:13:03.785384+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Installation_Agent
+Summary   : A cron job is configured to execute /tmp/evil.sh every minute.
+
+MITRE ATT&CK
+  Technique : T1053.003
+  Tactic    : Persistence
+
+Details
+  A cron job is configured to execute /tmp/evil.sh every minute. The
+  script resides in /tmp, a world‑writable temporary directory commonly
+  abused for malicious persistence, and the schedule (every minute)
+  provides continuous execution without any legitimate business
+  justification, matching the watched persistence indicators.
+
+Final Answer:
+  - Category          : scheduled_task_persistence
+  - Confidence        : high
+  - Severity          : 9
+  - Recommended action: Stop the cron job, inspect and quarantine /tmp/evil.sh, and conduct a full host investigation for additional compromise artifacts.
+
+==========================================================================
+[NONE] COMMAND & CONTROL ALERT  (severity 0)
+==========================================================================
+Timestamp : 2026-09-30T08:13:08.118229+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : C2_Agent
+Summary   : The log shows two established TCP connections using raw IP addresses and high-numbered ports, but there is no evidence of periodic timing, consistent tiny payloads, or a suspicious User-Agent string that would indicate web‑based C2 beaconing.
+
+MITRE ATT&CK
+  Technique : T1071.001
+  Tactic    : Command and Control
+
+Details
+  The log shows two established TCP connections using raw IP addresses and
+  high-numbered ports, but there is no evidence of periodic timing,
+  consistent tiny payloads, or a suspicious User-Agent string that would
+  indicate web‑based C2 beaconing. Without additional indicators such as
+  repeated intervals or abnormal HTTP headers, these connections appear
+  benign for the specific C2‑beaconing behavior being monitored.
+
+Final Answer:
+  - Category          : c2_beaconing
+  - Confidence        : high
+  - Severity          : 0
+  - Recommended action: Log the connection details for baseline tracking and continue monitoring for any future patterns that match the defined C2 indicators.
+
+##########################################################################
+#              CORRELATED KILL-CHAIN SUMMARY (Coordinator)               #
+##########################################################################
+==========================================================================
+[MEDIUM] KILL-CHAIN CORRELATION ALERT  (severity 10)
+==========================================================================
+Timestamp : 2026-09-30T08:12:42.287372+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Coordinator_Agent
+Summary   : On 2026‑09‑30 the host 10.10.10.30 received a spear‑phishing email (08:11:25, 08:11:55, 08:12:25) containing urgent language, a “verify your account” prompt and a Bit.ly link – classic T1566.002 indicators.
+
+MITRE ATT&CK
+  Technique : T1027,T1071.001,T1566.002
+  Tactic    : Command and Control -> Defense Evasion -> Initial Access
+
+Details
+  On 2026‑09‑30 the host 10.10.10.30 received a spear‑phishing email
+  (08:11:25, 08:11:55, 08:12:25) containing urgent language, a “verify
+  your account” prompt and a Bit.ly link – classic T1566.002 indicators. A
+  user appears to have followed the link, triggering a command that echoed
+  a Base64‑encoded payload, decoded it and piped it to bash (08:11:59,
+  08:12:29). The decoded script fetched and executed
+  `http://45.33.12.9/x.sh`, confirming the watched obfuscation pattern
+  (T1027). Shortly after, the host opened outbound SSH sessions (08:10:38,
+  08:11:08) to external and internal high‑numbered ports, likely
+  establishing a back‑channel for command‑and‑control despite not matching
+  the specific beaconing signatures. The sequence – phishing delivery,
+  malicious script execution, and subsequent SSH/TCP connections – forms a
+  coordinated multi‑stage attack targeting 10.10.10.30.
+
+Final Answer:
+  - Category          : kill_chain_correlation
+  - Confidence        : high
+  - Severity          : 10
+  - Recommended action: Immediately isolate/quarantine host 10.10.10.30 from the network and begin a forensic investigation while blocking the malicious Bit.ly URL and the external IP 45.33.12.9.
+
+==========================================================================
+Phases reporting a detection (severity >= 1): 3 of 5
+==========================================================================

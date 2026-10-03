@@ -1,0 +1,28 @@
+
+==============================================================================
+AAKCD detection latency report   (5 attacks, window 900s)
+==============================================================================
+
+#   TECHNIQUE    DETECTOR             MTTD(s)    CORR(s)    RESULT
+------------------------------------------------------------------
+1   T1046        Recon_Agent          7.0        26.8       DETECTED
+2   T1566.002    Delivery_Agent       2.8        18.7       DETECTED
+3   T1027        Exploitation_Agent   29.3       10.7       DETECTED
+4   T1053.003    Installation_Agent   22.6       0.5        DETECTED
+5   T1071.001    C2_Agent             18.6       23.0       DETECTED
+
+------------------------------------------------------------------
+Detected 5/5 (100% coverage)
+
+TECHNIQUE    N    MEAN(s)    MIN(s)     MAX(s)    
+--------------------------------------------------
+T1027        1    29.3       29.3       29.3      
+T1046        1    7.0        7.0        7.0       
+T1053.003    1    22.6       22.6       22.6      
+T1071.001    1    18.6       18.6       18.6      
+T1566.002    1    2.8        2.8        2.8       
+--------------------------------------------------
+OVERALL      5    16.0       2.8        29.3      
+
+Note: MTTD includes scheduler polling delay. Report the poll interval alongside these figures.
+
